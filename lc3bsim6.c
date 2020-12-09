@@ -1,6 +1,6 @@
 /*
-    Name 1: Your Name
-    UTEID 1: Your UTEID
+    Name 1: Simoni Maniar
+    UTEID 1: ssm3256
 */
 
 /***************************************************************/
@@ -1087,6 +1087,7 @@ void AGEX_stage() {
   {
     case 0: shift_result = Low16bits(A << shiftamt); break;
     case 1: shift_result = Low16bits(A >> shiftamt); break;
+    case 2: shift_result = Low16bits(A << shiftamt); break;
     case 3: shift_result = Low16bits(getSext(A >> shiftamt, 16 - shiftamt)); break;
   }
 
@@ -1151,21 +1152,25 @@ void DE_stage() {
 
 
   dep_stall = 0;
+  //printf("%d   %d   %d\n", PS.AGEX_DRID, sr1, sr2);
   //dep_stall
-  if(PS.DE_V == 1){
+  if(PS.DE_V){
     // sr1
     if(Get_SR1_NEEDED(DE_CS)){
-      if((v_agex_ld_reg & (PS.AGEX_DRID == sr1)) | (v_mem_ld_reg & (PS.MEM_DRID == sr1)) | (v_sr_ld_reg & (PS.SR_DRID == sr1))){
+      if((v_agex_ld_reg & (PS.AGEX_DRID == sr1num))|(v_mem_ld_reg & (PS.MEM_DRID == sr1num))|(v_sr_ld_reg & (PS.SR_DRID == sr1num))){
+        //printf("hi1\n");
         dep_stall = 1; // sr1 dependency
       }
     }
     if (Get_SR2_NEEDED(DE_CS)){
-      if ((v_agex_ld_reg & (PS.AGEX_DRID == sr2)) | (v_mem_ld_reg & (PS.MEM_DRID == sr2)) | (v_sr_ld_reg & (PS.SR_DRID == sr2))){
+      if ((v_agex_ld_reg & (PS.AGEX_DRID == sr2num))|(v_mem_ld_reg & (PS.MEM_DRID == sr2num))|(v_sr_ld_reg & (PS.SR_DRID == sr2num))){
+        //printf("hi2\n");
         dep_stall = 1; // sr2 dependency
       }
     }
     if(Get_DE_BR_OP(DE_CS)){
       if(v_agex_ld_cc | v_mem_ld_cc | v_sr_ld_cc){
+        //printf("hi3\n");
         dep_stall = 1; // cc dependency
       }
     }
