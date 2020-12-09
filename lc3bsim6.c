@@ -945,7 +945,11 @@ void MEM_stage() {
   v_mem_br_stall = PS.MEM_V & Get_MEM_BR_STALL(PS.MEM_CS);
   v_mem_ld_reg = PS.MEM_V & Get_MEM_LD_REG(PS.MEM_CS);
   v_mem_ld_cc = PS.MEM_V & Get_MEM_LD_CC(PS.MEM_CS);
-  int we1, we0, load, store = 0x000;
+  int we1 = 0;
+  int we0 = 0;
+  int load = 0;
+  int store = 0;
+  target_pc = PS.MEM_ADDRESS;
   int dcache_r = 1;
   int dcache_en = Get_DCACHE_EN(PS.MEM_CS) & PS.MEM_V;
 
@@ -955,12 +959,10 @@ void MEM_stage() {
   int bit0 = PS.MEM_ADDRESS & 0x0001;
   if(rw == 1){
     if(datasize == 1){
-        store = Low16bits(PS.MEM_ALU_RESULT);
         we1 = 1;
         we0 = 1;
     }
-    else{
-      store = Low16bits(((PS.MEM_ALU_RESULT & 0x0FF) << 8) + (PS.MEM_ALU_RESULT & 0x0FF));
+    else{ 
       if(bit0 == 0){ 
         we0 = 1; // lower byte
       }
@@ -970,6 +972,14 @@ void MEM_stage() {
     }
   }
 
+  if(datasize == 1){
+    store = (PS.MEM_ALU_RESULT);
+  }
+  else{
+    store = (((PS.MEM_ALU_RESULT & 0x0FF) << 8) + (PS.MEM_ALU_RESULT & 0x0FF));
+  }
+
+  load = 0x0000;
   if(dcache_en){
     dcache_access(PS.MEM_ADDRESS, &load, store, &dcache_r, we0, we1);
   }
@@ -981,15 +991,14 @@ void MEM_stage() {
   // load byte, clear other byte
   if(datasize == 0){
     if(bit0 == 0){ // lower byte
-      load = Low16bits(getSext((load & 0x0FF), 8));
+      load = getSext((load & 0x0FF), 8);
     }
     else { // upper byte
-      load = Low16bits(getSext((load >> 8), 8));
+      load = getSext((load >> 8), 8);
     }
   }
 
-  target_pc = PS.MEM_ADDRESS;
-  trap_pc = Low16bits(load);
+  trap_pc = (load);
 
   // pc mux logic
   mem_pcmux = 0;
@@ -1009,13 +1018,14 @@ void MEM_stage() {
     }
   }
 
+
   // latching
-  NEW_PS.SR_ADDRESS = Low16bits(PS.MEM_ADDRESS);
+  NEW_PS.SR_ADDRESS = PS.MEM_ADDRESS;
   NEW_PS.SR_DATA = Low16bits(load);
-  NEW_PS.SR_NPC = Low16bits(PS.MEM_NPC);
-  NEW_PS.SR_ALU_RESULT = Low16bits(PS.MEM_ALU_RESULT);
-  NEW_PS.SR_IR = Low16bits(PS.MEM_IR);
-  NEW_PS.SR_DRID = Low16bits(PS.MEM_DRID);
+  NEW_PS.SR_NPC = (PS.MEM_NPC);
+  NEW_PS.SR_ALU_RESULT = PS.MEM_ALU_RESULT;
+  NEW_PS.SR_IR = (PS.MEM_IR);
+  NEW_PS.SR_DRID = (PS.MEM_DRID);
   NEW_PS.SR_V = PS.MEM_V & !mem_stall;
   /* The code below propagates the control signals from MEM.CS latch
      to SR.CS latch. You still need to latch other values into the
@@ -1031,15 +1041,15 @@ int v_agex_ld_cc;
 /************************* AGEX_stage() *************************/
 void AGEX_stage() {
 
-  int shift_result, alu_result, alu_vs_shift_result;
-  int addr1_result, addr2_result, lshf_result, add_result, addressmux_result;
+  int shift_result;
+  int alu_result;
+  int alu_vs_shift_result;
+  int addr1_result;
+  int addr2_result;
+  int lshf_result;
+  int add_result; 
+  int addressmux_result;
   int ii, jj = 0;
-  int LD_MEM = !mem_stall; 
-
-  //v
-  v_agex_ld_reg = PS.AGEX_V & Get_AGEX_LD_REG(PS.AGEX_CS);
-  v_agex_ld_cc = PS.AGEX_V & Get_AGEX_LD_CC(PS.AGEX_CS);
-  v_agex_br_stall = PS.AGEX_V & Get_AGEX_BR_STALL(PS.AGEX_CS);
 
   // get address
   switch(Get_ADDR1MUX(PS.AGEX_CS)){
@@ -1062,7 +1072,7 @@ void AGEX_stage() {
   add_result = Low16bits(lshf_result + addr1_result);
 
   switch(Get_ADDRESSMUX(PS.AGEX_CS)){
-    case 0: addressmux_result = Low16bits((PS.AGEX_IR & 0x0FF) << 1); break;
+    case 0: addressmux_result = ((PS.AGEX_IR & 0x0FF) << 1); break;
     case 1: addressmux_result = add_result; break;
   }
 
@@ -1075,9 +1085,9 @@ void AGEX_stage() {
   // get alu result
   switch(Get_ALUK(PS.AGEX_CS)){
     case 0: alu_result = Low16bits(A + B); break;
-    case 1: alu_result = Low16bits(A & B); break;
-    case 2: alu_result = Low16bits(A ^ B); break;
-    case 3: alu_result = Low16bits(A); break;
+    case 1: alu_result = (A & B); break;
+    case 2: alu_result = (A ^ B); break;
+    case 3: alu_result = (B); break;
    }
 
   // get shift result
@@ -1086,9 +1096,9 @@ void AGEX_stage() {
   switch(AD)
   {
     case 0: shift_result = Low16bits(A << shiftamt); break;
-    case 1: shift_result = Low16bits(A >> shiftamt); break;
+    case 1: shift_result = Low16bits((A & 0x0FFFF) >> shiftamt); break;
     case 2: shift_result = Low16bits(A << shiftamt); break;
-    case 3: shift_result = Low16bits(getSext(A >> shiftamt, 16 - shiftamt)); break;
+    case 3: shift_result = Low16bits(A >> shiftamt); break;
   }
 
   
@@ -1096,16 +1106,23 @@ void AGEX_stage() {
     case 0: alu_vs_shift_result = shift_result; break;
     case 1: alu_vs_shift_result = alu_result; break;
   }
+
+    //v
+  v_agex_ld_reg = PS.AGEX_V & Get_AGEX_LD_REG(PS.AGEX_CS);
+  v_agex_ld_cc = PS.AGEX_V & Get_AGEX_LD_CC(PS.AGEX_CS);
+  v_agex_br_stall = PS.AGEX_V & Get_AGEX_BR_STALL(PS.AGEX_CS);
   
+  int LD_MEM = !mem_stall; 
+
   if (LD_MEM) {
     /* Your code for latching into MEM latches goes here */
-    NEW_PS.MEM_ADDRESS = Low16bits(addressmux_result);
-    NEW_PS.MEM_NPC = Low16bits(PS.AGEX_NPC);
-    NEW_PS.MEM_CC = Low16bits(PS.AGEX_CC);
-    NEW_PS.MEM_ALU_RESULT = Low16bits(alu_vs_shift_result);
-    NEW_PS.MEM_IR = Low16bits(PS.AGEX_IR);
-    NEW_PS.MEM_DRID = Low16bits(PS.AGEX_DRID);
-    NEW_PS.MEM_V = Low16bits(PS.AGEX_V);
+    NEW_PS.MEM_ADDRESS = (addressmux_result);
+    NEW_PS.MEM_NPC = (PS.AGEX_NPC);
+    NEW_PS.MEM_CC = (PS.AGEX_CC);
+    NEW_PS.MEM_ALU_RESULT =  Low16bits(alu_vs_shift_result);
+    NEW_PS.MEM_IR = (PS.AGEX_IR);
+    NEW_PS.MEM_DRID = (PS.AGEX_DRID);
+    NEW_PS.MEM_V = (PS.AGEX_V);
     /* The code below propagates the control signals from AGEX.CS latch
        to MEM.CS latch. */
     for (ii = COPY_MEM_CS_START; ii < NUM_AGEX_CS_BITS; ii++) {
@@ -1118,17 +1135,16 @@ void AGEX_stage() {
 /************************* DE_stage() *************************/
 void DE_stage() {
   int DE_CS[NUM_CONTROL_STORE_BITS];
-  int CONTROL_STORE_ADDRESS = Low16bits((PS.DE_IR & 0x0F800) >> 10) + ((PS.DE_IR & 0x20) >> 5); 
+  int CONTROL_STORE_ADDRESS = ((PS.DE_IR & 0x0F800) >> 10) + ((PS.DE_IR & 0x20) >> 5); 
   memcpy(DE_CS, CONTROL_STORE[CONTROL_STORE_ADDRESS], sizeof(int)*NUM_CONTROL_STORE_BITS);
   int ii, jj = 0;
-  int LD_AGEX = !mem_stall; 
 
   //v_de_br_stall
   v_de_br_stall = PS.DE_V & Get_DE_BR_STALL(DE_CS);
 
   //sr1
   int sr1num = (PS.DE_IR & 0x1C0) >> 6;
-  int sr1 = Low16bits(REGS[sr1num]);
+  int sr1 = (REGS[sr1num]);
 
   //sr2
   int sr2num;
@@ -1136,10 +1152,13 @@ void DE_stage() {
     case 0: sr2num = PS.DE_IR & 0x7; break;
     case 1: sr2num = (PS.DE_IR & 0x0E00) >> 9; break;
   }
-  int sr2 = Low16bits(REGS[sr2num]);
+  int sr2 = (REGS[sr2num]);
 
   //save cc
   int current_cc = (N<<2) + (Z<<1) + P;
+
+  //v_sr_ld_reg
+  if(v_sr_ld_reg != 0) REGS[PS.SR_DRID] = (sr_reg_data);
 
   //v_sr_ld_cc
   if(v_sr_ld_cc != 0){
@@ -1147,30 +1166,24 @@ void DE_stage() {
     Z = sr_z;
     P = sr_p;
   }
-  //v_sr_ld_reg
-  if(v_sr_ld_reg != 0) REGS[PS.SR_DRID] = Low16bits(sr_reg_data);
-
 
   dep_stall = 0;
   //printf("%d   %d   %d\n", PS.AGEX_DRID, sr1, sr2);
   //dep_stall
-  if(PS.DE_V){
+  if(PS.DE_V == 1){
     // sr1
     if(Get_SR1_NEEDED(DE_CS)){
       if((v_agex_ld_reg & (PS.AGEX_DRID == sr1num))|(v_mem_ld_reg & (PS.MEM_DRID == sr1num))|(v_sr_ld_reg & (PS.SR_DRID == sr1num))){
-        //printf("hi1\n");
         dep_stall = 1; // sr1 dependency
       }
     }
     if (Get_SR2_NEEDED(DE_CS)){
       if ((v_agex_ld_reg & (PS.AGEX_DRID == sr2num))|(v_mem_ld_reg & (PS.MEM_DRID == sr2num))|(v_sr_ld_reg & (PS.SR_DRID == sr2num))){
-        //printf("hi2\n");
         dep_stall = 1; // sr2 dependency
       }
     }
     if(Get_DE_BR_OP(DE_CS)){
       if(v_agex_ld_cc | v_mem_ld_cc | v_sr_ld_cc){
-        //printf("hi3\n");
         dep_stall = 1; // cc dependency
       }
     }
@@ -1179,17 +1192,18 @@ void DE_stage() {
   // dr_id
   int drid_result;
   switch(Get_DRMUX(DE_CS)){
-    case 0: drid_result = Low16bits((PS.DE_IR & 0x0E00) >> 9); break;
+    case 0: drid_result = ((PS.DE_IR & 0x0E00) >> 9); break;
     case 1: drid_result = 7; break;
   }
 
+  int LD_AGEX = !mem_stall; 
   if (LD_AGEX) {
     /* Your code for latching into AGEX latches goes here */
-    NEW_PS.AGEX_NPC = Low16bits(PS.DE_NPC);
-    NEW_PS.AGEX_IR = Low16bits(PS.DE_IR);
-    NEW_PS.AGEX_SR1 = Low16bits(sr1);
-    NEW_PS.AGEX_SR2 = Low16bits(sr2);
-    NEW_PS.AGEX_CC = Low16bits(current_cc);
+    NEW_PS.AGEX_NPC = (PS.DE_NPC);
+    NEW_PS.AGEX_IR = (PS.DE_IR);
+    NEW_PS.AGEX_SR1 = (sr1);
+    NEW_PS.AGEX_SR2 = (sr2);
+    NEW_PS.AGEX_CC = (current_cc);
     NEW_PS.AGEX_DRID = drid_result;
     NEW_PS.AGEX_V = (PS.DE_V & !dep_stall); 
     /* The code below propagates the control signals from the CONTROL
@@ -1203,8 +1217,11 @@ void DE_stage() {
 /************************* FETCH_stage() *************************/
 void FETCH_stage() {
   // target_pc, trap_pc, mem_pcmux exist from memstage
-  int pc_plus2, ld_pc, ld_de, n_de_ir;
-  pc_plus2 = Low16bits(PC + 2);
+  int pc_plus2;
+  int ld_pc;
+  int ld_de; 
+  int n_de_ir;
+  pc_plus2 = (PC + 2);
   icache_access(PC, &n_de_ir, &icache_r);
 
   /*logic for pc either 1) no stalls and icache r or 2) br_stall, but pc_mux != 0 */
@@ -1213,9 +1230,9 @@ void FETCH_stage() {
 
   int pcmux_result;
   switch(mem_pcmux){
-    case 0: pcmux_result = Low16bits(pc_plus2); break;
-    case 1: pcmux_result = Low16bits(target_pc); break;
-    case 2: pcmux_result = Low16bits(trap_pc); break;
+    case 0: pcmux_result = (pc_plus2); break;
+    case 1: pcmux_result = (target_pc); break;
+    case 2: pcmux_result = (trap_pc); break;
   }
 
   if(ld_pc != 0){
@@ -1225,7 +1242,7 @@ void FETCH_stage() {
   ld_de = (!dep_stall & !mem_stall);
   if(ld_de != 0){
     NEW_PS.DE_NPC = pc_plus2;
-    NEW_PS.DE_IR = Low16bits(n_de_ir);
+    NEW_PS.DE_IR = (n_de_ir);
     NEW_PS.DE_V = nostalls & icache_r;
   }
 }  
